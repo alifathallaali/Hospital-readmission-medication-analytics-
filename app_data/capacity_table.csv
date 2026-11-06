@@ -1,0 +1,4 @@
+flag top,patients flagged,readmissions caught,recall %,precision %,lift
+5%,699,180,14.3,25.8,2.87
+10%,1399,289,23.0,20.7,2.3
+20%,2798,477,38.0,17.0,1.9
