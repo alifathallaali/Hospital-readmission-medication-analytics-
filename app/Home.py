@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -6,60 +7,74 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-st.set_page_config(page_title="PharmaLens - Hospital Readmission & Medication Analytics", layout="wide")
+st.set_page_config(page_title="Hospital Readmission Analytics", layout="wide")
 
 # All data come from small aggregate tables exported by the notebooks (no patient-level rows)
 DATA = Path(__file__).resolve().parent.parent / "app_data"
 
+REQUIRED = [
+    "readmission_by_group.csv", "capacity_curve.csv", "capacity_table.csv", "calibration.csv",
+    "pr_curve.csv", "subgroups.csv", "model_comparison.csv", "kpis.json",
+    "mimic_diagnoses.csv", "mimic_top_drugs.csv", "mimic_diabetic_drugs.csv",
+    "mimic_los.csv", "mimic_insulin.csv", "mimic_kpis.json",
+]
+
+# Stop with a clear message instead of crashing if an export is missing
+missing = [f for f in REQUIRED if not (DATA / f).exists()]
+if missing:
+    st.error("Missing data files in `app_data/`: " + ", ".join(missing)
+             + ". Re-run the export cells at the end of the notebooks.")
+    st.stop()
+
 
 @st.cache_data
 def load():
-    d = {}
-    # Load primary readmission analytics aggregates
-    try:
-        d["groups"] = pd.read_csv(DATA / "readmission_by_group.csv", dtype={"group": str})
-        d["cap_curve"] = pd.read_csv(DATA / "capacity_curve.csv")
-        d["cap_table"] = pd.read_csv(DATA / "capacity_table.csv")
-        d["cal"] = pd.read_csv(DATA / "calibration.csv")
-        d["pr"] = pd.read_csv(DATA / "pr_curve.csv")
-        d["sub"] = pd.read_csv(DATA / "subgroups.csv", dtype={"group": str})
-        d["models"] = pd.read_csv(DATA / "model_comparison.csv")
-        with open(DATA / "kpis.json") as f:
-            d["kpi"] = json.load(f)
-    except Exception:
-        pass
-
-    # Load MIMIC-IV clinical aggregates
-    try:
-        with open(DATA / "mimic_kpis.json") as f:
-            d["mimic_kpi"] = json.load(f)
-        d["mimic_diagnoses"] = pd.read_csv(DATA / "mimic_diagnoses.csv")
-        d["mimic_top_drugs"] = pd.read_csv(DATA / "mimic_top_drugs.csv")
-        d["mimic_diabetic_drugs"] = pd.read_csv(DATA / "mimic_diabetic_drugs.csv")
-        d["mimic_los"] = pd.read_csv(DATA / "mimic_los.csv")
-        d["mimic_insulin"] = pd.read_csv(DATA / "mimic_insulin.csv")
-    except Exception:
-        pass
-
+    d = {
+        "groups": pd.read_csv(DATA / "readmission_by_group.csv", dtype={"group": str}),
+        "cap_curve": pd.read_csv(DATA / "capacity_curve.csv"),
+        "cap_table": pd.read_csv(DATA / "capacity_table.csv"),
+        "cal": pd.read_csv(DATA / "calibration.csv"),
+        "pr": pd.read_csv(DATA / "pr_curve.csv"),
+        "sub": pd.read_csv(DATA / "subgroups.csv", dtype={"group": str}),
+        "models": pd.read_csv(DATA / "model_comparison.csv"),
+        "m_dx": pd.read_csv(DATA / "mimic_diagnoses.csv"),
+        "m_drugs": pd.read_csv(DATA / "mimic_top_drugs.csv"),
+        "m_dm": pd.read_csv(DATA / "mimic_diabetic_drugs.csv"),
+        "m_los": pd.read_csv(DATA / "mimic_los.csv"),
+        "m_ins": pd.read_csv(DATA / "mimic_insulin.csv"),
+    }
+    with open(DATA / "kpis.json") as f:
+        d["kpi"] = json.load(f)
+    with open(DATA / "mimic_kpis.json") as f:
+        d["mk"] = json.load(f)
     return d
 
 
 D = load()
-
-if "kpi" not in D:
-    st.error("⚠️ Essential project data files are missing in `app_data/`. Please run the export cells in the notebooks first.")
-    st.stop()
-
 K = D["kpi"]
+MK = D["mk"]
 
-st.title("🏥 PharmaLens: Hospital Readmission & Medication Analytics")
+
+def wilson(k, n, z=1.96):
+    """95% Wilson confidence interval for a proportion."""
+    if n == 0:
+        return 0.0, 0.0
+    p = k / n
+    denom = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / denom
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return centre - half, centre + half
+
+
+st.title("Hospital Readmission & Medication Analytics")
 st.caption(
-    "Retrospective analysis of the Diabetes 130-US Hospitals dataset (1999-2008) and MIMIC-IV clinical aggregates. "
-    "Educational portfolio project: not clinically validated and not clinical decision support."
+    "Retrospective analysis of the Diabetes 130-US Hospitals dataset (1999-2008) plus SQL exploration of the "
+    "MIMIC-IV demo. Educational portfolio project: not clinically validated and not clinical decision support. "
+    "This dashboard shows pre-computed aggregate results; it does not run a live model."
 )
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Overview", "Risk factors", "Model performance", "MIMIC-IV Analytics", "Methodology and limits"]
+    ["Overview", "Risk factors", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits"]
 )
 
 # ---------------------------------------------------------------- Overview
@@ -81,7 +96,8 @@ with tab1:
         "- Prior inpatient stays are the strongest signal.\n"
         "- Discharge to another care facility carries a much higher rate than discharge home.\n"
         "- Longer stays and older age are associated with higher readmission.\n"
-        "- The model ranks patients usefully but only modestly (see *Model performance*)."
+        "- The model ranks patients usefully but only modestly (see *Model performance*).\n"
+        "- In the MIMIC demo, an insulin *order* is not proof of administration (see *MIMIC-IV demo*)."
     )
 
 # ------------------------------------------------------------ Risk factors
@@ -91,7 +107,7 @@ with tab2:
         "time_in_hospital": "Length of stay (days)",
         "med_bin": "Number of medications",
         "insulin": "Insulin (No / Steady / Up / Down)",
-        "change": "Any medication change (Ch = changed)",
+        "change": "Any change in diabetes medications (Ch = changed)",
         "number_inpatient_cap": "Prior inpatient visits (3 = 3 or more)",
         "discharge_disposition_id": "Discharge disposition code",
     }
@@ -107,7 +123,7 @@ with tab2:
     fig.update_traces(texttemplate="n=%{text:,}", textposition="outside")
     fig.add_hline(y=K["readmit_rate_pct"], line_dash="dash",
                   annotation_text=f"Overall {K['readmit_rate_pct']}%")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
     st.caption(
         "Associations, not causal effects: sicker patients receive more drugs, more dose changes and "
         "longer stays. Check the meaning of discharge codes in the dataset's IDs_mapping file."
@@ -118,91 +134,158 @@ with tab3:
     st.subheader("Capacity analysis (sealed hold-out)")
     cap = D["cap_curve"].copy()
     cap["flag_pct"] = cap["flag_pct"].round().astype(int)
+    tbl = D["cap_table"].copy()
+    tbl["pct"] = tbl["flag top"].astype(str).str.rstrip("%").astype(int)
+
+    # Consistency check between two exports of the same analysis
+    for _, r in tbl.iterrows():
+        c_ = cap.loc[cap["flag_pct"] == r["pct"], "recall_pct"]
+        if len(c_) and abs(float(c_.iloc[0]) - float(r["recall %"])) > 0.6:
+            st.warning("The capacity curve and capacity table disagree: the exports may come from different "
+                       "model runs. Re-run the export cell.")
+            break
 
     pct = st.select_slider(
         "Follow-up capacity: share of discharges flagged (highest predicted risk first)",
         options=list(cap["flag_pct"]), value=10,
     )
-    recall = float(cap.loc[cap["flag_pct"] == pct, "recall_pct"].iloc[0])
-    lift = recall / pct
-
-    # Use exact precision from capacity table if available
-    cap_table = D.get("cap_table")
-    if cap_table is not None and "precision_pct" in cap_table.columns and pct in cap_table["flag_pct"].values:
-        precision = float(cap_table.loc[cap_table["flag_pct"] == pct, "precision_pct"].iloc[0])
+    exact = tbl[tbl["pct"] == pct]
+    if len(exact):
+        r = exact.iloc[0]
+        flagged, recall = int(r["patients flagged"]), float(r["recall %"])
+        precision, lift = float(r["precision %"]), float(r["lift"])
+        note = "Exact values from the hold-out set."
     else:
+        recall = float(cap.loc[cap["flag_pct"] == pct, "recall_pct"].iloc[0])
+        lift = recall / pct
         precision = lift * K["readmit_rate_pct"]
+        flagged = round(K["holdout_n"] * pct / 100)
+        note = "Approximate values (precision = prevalence x lift); exact values exist for 5%, 10% and 20%."
 
     m = st.columns(4)
-    m[0].metric("Patients flagged", f"{round(K['holdout_n'] * pct / 100):,}")
+    m[0].metric("Patients flagged", f"{flagged:,}")
     m[1].metric("Readmissions caught", f"{recall:.0f}%")
     m[2].metric("Lift vs random list", f"{lift:.2f}x")
-    m[3].metric("Precision", f"{precision:.1f}%" if isinstance(precision, float) else f"{precision}%")
+    m[3].metric("Precision", f"{precision:.0f}%")
+    st.caption(note + " Most flagged patients are not readmitted, so any intervention should be low-cost.")
 
     cf = go.Figure()
     cf.add_trace(go.Scatter(x=cap["flag_pct"], y=cap["recall_pct"], mode="lines+markers",
-                            name="HistGradientBoosting / Logistic Regression"))
+                            name="Logistic regression"))
     cf.add_trace(go.Scatter(x=[0, 100], y=[0, 100], mode="lines", name="Random list",
                             line=dict(dash="dash")))
     cf.update_layout(xaxis_title="Patients flagged (%)", yaxis_title="Readmissions captured (%)")
-    st.plotly_chart(cf, use_container_width=True)
-    st.caption("Most flagged patients are not readmitted, so any intervention should be low-cost.")
+    st.plotly_chart(cf)
 
     left, right = st.columns(2)
     with left:
         st.subheader("Calibration")
-        cal = D["cal"]
-        fc = px.line(cal, x="predicted", y="observed", color="model", markers=True)
+        fc = px.line(D["cal"], x="predicted", y="observed", color="model", markers=True)
         fc.add_trace(go.Scatter(x=[0, 0.75], y=[0, 0.75], mode="lines", name="Perfect",
                                 line=dict(dash="dash", color="gray")))
         fc.update_layout(xaxis_title="Predicted probability", yaxis_title="Observed rate")
-        st.plotly_chart(fc, use_container_width=True)
-        st.caption("The unweighted model matches observed rates; the class-weighted one overstates risk.")
+        st.plotly_chart(fc)
+        st.caption("The unweighted model matches observed rates; the class-weighted one overstates risk "
+                   "(same ranking, wrong probabilities).")
     with right:
         st.subheader("Precision-recall curve")
         fp = px.line(D["pr"], x="recall", y="precision")
         fp.add_hline(y=K["readmit_rate_pct"] / 100, line_dash="dash",
                      annotation_text="Baseline (prevalence)")
-        st.plotly_chart(fp, use_container_width=True)
+        st.plotly_chart(fp)
         st.caption(f"PR-AUC {K['holdout_pr_auc']}, ROC-AUC {K['holdout_roc_auc']}, "
                    f"Brier {K['holdout_brier']} (hold-out).")
 
     st.subheader("Model comparison (5-fold cross-validation on the development set)")
     mc = D["models"].copy()
+    mc["model"] = mc["model"].replace({"Gradient Boosting": "HistGradientBoosting"})
     mc["ROC-AUC"] = mc.apply(lambda r: f"{r.roc_auc:.3f} +/- {r.roc_sd:.3f}", axis=1)
     mc["PR-AUC"] = mc.apply(lambda r: f"{r.pr_auc:.3f} +/- {r.pr_sd:.3f}", axis=1)
     st.dataframe(mc[["model", "ROC-AUC", "PR-AUC"]], hide_index=True)
-    st.caption("All models perform within noise, so the simplest one was chosen.")
+    st.caption("All models perform within noise, so the simplest one (logistic regression) was chosen.")
 
     st.subheader("Subgroup audit (race is not a model feature)")
-    sub = D["sub"].query("n >= 10")
+    sub = D["sub"].query("n >= 10")                   # suppress tiny cells
     sv = st.selectbox("Group by", sorted(sub["variable"].unique()))
     s = sub[sub["variable"] == sv]
     st.dataframe(s.drop(columns="variable"), hide_index=True)
+    sp = s.dropna(subset=["recall %"])
+    if len(sp):
+        fs = px.bar(sp, x="group", y="recall %", text="readmitted",
+                    category_orders={"group": list(sp["group"])})
+        fs.update_traces(texttemplate="readmissions=%{text}", textposition="outside")
+        st.plotly_chart(fs)
+    st.caption("Blank cells: fewer than 30 readmissions, not interpreted. Many comparisons were made, "
+               "so isolated differences are hypotheses, not findings.")
 
-# ---------------------------------------------------- MIMIC-IV Analytics
+# ------------------------------------------------------------ MIMIC-IV demo
 with tab4:
-    st.subheader("🔬 MIMIC-IV Clinical & Medication Analytics")
-    st.markdown("Aggregated clinical insights derived from the MIMIC-IV demo database (patient-level identifiers excluded).")
+    st.warning(
+        "MIMIC-IV **demo**: 100 patients and 275 admissions from one academic medical center. It is a development "
+        "sample, not representative of a hospital population. All numbers are exploratory; only aggregate counts are shown."
+    )
+    k, n_alive = MK["readmit_unplanned"], MK["discharged_alive"]
+    lo, hi = wilson(k, n_alive)
 
-    if "mimic_kpi" in D:
-        mk = D["mimic_kpi"]
-        mc1, mc2, mc3, mc4 = st.columns(4)
-        mc1.metric("Total Admissions", f"{mk['admissions']:,}")
-        mc2.metric("Total Patients", f"{mk['patients']:,}")
-        mc3.metric("Diabetes Admissions", f"{mk['with_diabetes']:,}")
-        mc4.metric("30-Day Unplanned Readmit", f"{mk['readmit_unplanned']:,}")
+    c = st.columns(4)
+    c[0].metric("Admissions", f"{MK['admissions']:,}")
+    c[1].metric("Patients", f"{MK['patients']:,}")
+    c[2].metric("Admissions with diabetes", f"{MK['with_diabetes']} ({MK['with_diabetes'] / MK['admissions'] * 100:.0f}%)")
+    c[3].metric("Unplanned 30-day readmission", f"{k / n_alive * 100:.1f}%")
+    st.caption(
+        f"{k} of {n_alive} live discharges (95% interval {lo * 100:.0f}% to {hi * 100:.0f}%); "
+        f"any next admission: {MK['readmit_any']} of {n_alive}. Not comparable with the diabetes dataset "
+        "(different hospital, case mix, admission types and counting rules). "
+        f"Database validated: {MK['tables_checked']} tables checked, {MK['table_mismatches']} mismatches with the source CSV files."
+    )
 
-        st.markdown("#### Top Frequent Diagnoses (ICD-9 / ICD-10)")
-        st.dataframe(D["mimic_diagnoses"], use_container_width=True, hide_index=True)
+    left, right = st.columns(2)
+    with left:
+        st.subheader("Most frequent diagnoses")
+        dx = D["m_dx"].copy().head(10)
+        dx["label"] = dx["diagnosis"].str.slice(0, 40) + " (ICD-" + dx["icd_version"].astype(str) + ")"
+        fdx = px.bar(dx.sort_values("admissions"), x="admissions", y="label", orientation="h")
+        fdx.update_layout(yaxis_title="")
+        st.plotly_chart(fdx)
+        st.caption("The same disease can appear under ICD-9 and ICD-10 codes, so counts should be read by condition.")
+    with right:
+        st.subheader("Most ordered therapeutic drugs")
+        td = D["m_drugs"].head(10)
+        ftd = px.bar(td.sort_values("admissions"), x="admissions", y="drug", orientation="h")
+        ftd.update_layout(yaxis_title="")
+        st.plotly_chart(ftd)
+        st.caption("Fluids and flushes were removed with a name-based filter (a heuristic, not a drug classification). "
+                   "These are orders, not administrations.")
 
-        st.markdown("#### Top Prescribed Therapeutic Drugs")
-        st.dataframe(D["mimic_top_drugs"], use_container_width=True, hide_index=True)
+    st.subheader("Drugs in diabetic vs non-diabetic admissions")
+    dd = D["m_dm"].head(10).melt(id_vars="drug", value_vars=["pct_diabetic", "pct_non_diabetic"],
+                                 var_name="group", value_name="pct")
+    dd["group"] = dd["group"].map({"pct_diabetic": "Diabetic admissions",
+                                   "pct_non_diabetic": "Other admissions"})
+    fdd = px.bar(dd, x="drug", y="pct", color="group", barmode="group",
+                 labels={"pct": "% of admissions with an order"})
+    st.plotly_chart(fdd)
+    st.caption("Descriptive only; orders, not administrations; no significance testing.")
 
-        st.markdown("#### Insulin: Orders vs. Recorded Administrations (eMAR)")
-        st.dataframe(D["mimic_insulin"], use_container_width=True, hide_index=True)
-    else:
-        st.warning("MIMIC aggregated data files not found. Please run the export cells in `02_mimic_sql.ipynb`.")
+    st.subheader("Insulin: orders versus recorded administrations")
+    ins = D["m_ins"].iloc[0]
+    fi = px.bar(
+        x=["Insulin order", "Order that appears in eMAR", "Administration recorded", "Order and administration"],
+        y=[int(ins["insulin_ordered"]), int(ins["ordered_in_emar"]),
+           int(ins["insulin_administered"]), int(ins["both_"])],
+        labels={"x": "", "y": "Admissions"}, text=[int(ins["insulin_ordered"]), int(ins["ordered_in_emar"]),
+                                                    int(ins["insulin_administered"]), int(ins["both_"])],
+    )
+    st.plotly_chart(fi)
+    st.caption(
+        "Orders overstate exposure. The eMAR table covers only part of the care areas (ICU medications are largely "
+        "recorded elsewhere), so the gap does not mean patients were untreated."
+    )
+
+    st.subheader("Length of stay by admission type")
+    los = D["m_los"].copy()
+    los["note"] = los["admissions"].apply(lambda n: "too small to compare" if n < 30 else "")
+    st.dataframe(los, hide_index=True)
 
 # ------------------------------------------------------------ Methodology
 with tab5:
@@ -210,16 +293,19 @@ with tab5:
         """
 **Cohort.** First encounter per patient (lowest `encounter_id`, a time proxy because the dataset has no dates),
 excluding deaths and hospice discharges. Prediction point: moment of discharge.
-Target: readmission within 30 days.
+Target: readmission within 30 days. Sensitivity checks with all eligible encounters (patient-grouped split) and with
+exclusions applied before choosing the first encounter gave similar results.
 
 **Evaluation.** Model selection by 5-fold cross-validation on 80% of patients; a 20% hold-out was evaluated once.
-Thresholds were set on development data only.
+Thresholds were set on development data only. Diagnosis groups and treatment regimen were tested with paired
+cross-validation and did not improve the model, so they are descriptive only.
 
 **Limitations**
 - Historical data (1999-2008), administrative only, no detailed lab values or social factors.
 - Modest discrimination (ROC-AUC about 0.64); predicted risks rarely exceed about 0.25.
 - Retrospective, one dataset, no external validation; not clinical decision support.
 - Observational associations only, no causal claims.
+- The MIMIC demo has only 100 patients and is exploratory.
 
 **Data governance.** This app reads small aggregate tables only. No patient-level data are included.
         """
