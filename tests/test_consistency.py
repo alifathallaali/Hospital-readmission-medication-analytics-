@@ -75,6 +75,33 @@ def test_mimic_kpis_are_consistent():
     assert m["patients"] <= m["admissions"]
 
 
+def test_model_comparison_schema_and_values():
+    """Ensure model comparison export has required columns and valid performance ranges."""
+    df = pd.read_csv(APP / "model_comparison.csv")
+    expected_cols = {"model", "roc_auc", "roc_sd", "pr_auc", "pr_sd"}
+    assert expected_cols.issubset(df.columns), f"Missing columns in model_comparison.csv: {expected_cols - set(df.columns)}"
+    assert len(df) >= 4, "Model comparison should include at least 4 baseline/trained models."
+    assert ((df["roc_auc"] >= 0.5) & (df["roc_auc"] <= 1.0)).all()
+    assert ((df["pr_auc"] >= 0.0) & (df["pr_auc"] <= 1.0)).all()
+
+
+def test_subgroups_schema_and_validity():
+    """Verify subgroups export schema and structural integrity."""
+    df = pd.read_csv(APP / "subgroups.csv")
+    expected_cols = {"variable", "group", "n", "readmitted", "prevalence %", "ROC-AUC"}
+    assert expected_cols.issubset(df.columns), f"Missing columns in subgroups.csv: {expected_cols - set(df.columns)}"
+    assert len(df) > 0, "Subgroups export is empty."
+    assert (df["n"] > 0).all()
+
+
+def test_calibration_and_pr_curves_valid():
+    """Verify calibration and PR curve export files are non-empty and well-formed."""
+    cal = pd.read_csv(APP / "calibration.csv")
+    assert len(cal) > 0, "calibration.csv is empty"
+    pr = pd.read_csv(APP / "pr_curve.csv")
+    assert len(pr) > 0, "pr_curve.csv is empty"
+
+
 def test_readme_matches_exports():
     """If the model is re-run and the exports change, the README numbers must be updated too."""
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
