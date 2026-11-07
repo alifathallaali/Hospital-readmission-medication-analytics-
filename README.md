@@ -63,9 +63,9 @@ All models perform within noise of each other, so the simplest and most interpre
 ### Final evaluation on the sealed hold-out
 | Metric | Value |
 |---|---|
-| ROC-AUC | 0.641 (95% bootstrap CI 0.626-0.659) |
-| PR-AUC | 0.171 (95% CI 0.156-0.190); baseline = prevalence 0.090 |
-| Brier score | 0.0791 vs 0.0816 for a constant prediction of the prevalence |
+| ROC-AUC | 0.640 (95% bootstrap CI 0.626-0.659) |
+| PR-AUC | 0.166 (95% CI 0.156-0.190); baseline = prevalence 0.090 |
+| Brier score | 0.0793 vs 0.0816 for a constant prediction of the prevalence |
 
 **Calibration.** The unweighted model is well calibrated (mean predicted risk 0.090 = observed 0.090). The class-weighted model ranks patients equally well (ROC-AUC 0.642) but overstates risk (mean 0.47, Brier 0.2297), so it is not used for reporting risk.
 
@@ -75,9 +75,9 @@ All models perform within noise of each other, so the simplest and most interpre
 
 | Flag top | Patients flagged | Readmissions caught | Recall | Precision | Lift |
 |---|---|---|---|---|---|
-| 5% | 699 | 180 | 14.3% | 25.8% | 2.87x |
-| 10% | 1,399 | 289 | 23.0% | 20.7% | 2.30x |
-| 20% | 2,798 | 477 | 38.0% | 17.0% | 1.90x |
+| 5% | 699 | 173 | 13.8% | 24.7% | 2.76x |
+| 10% | 1,399 | 278 | 22.2% | 19.9% | 2.22x |
+| 20% | 2,798 | 468 | 37.4% | 16.7% | 1.87x |
 
 A threshold of 0.143 chosen on development data (out-of-fold predictions), not on the hold-out, flagged 9.8% of hold-out patients with recall 22.6% and precision 20.7%. About 4 of 5 flagged patients are not readmitted, so any intervention should be low-cost.
 
