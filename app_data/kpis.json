@@ -3,8 +3,8 @@
   "encounters_raw": 101766,
   "readmit_rate_pct": 9.0,
   "holdout_n": 13994,
-  "holdout_roc_auc": 0.641,
-  "holdout_pr_auc": 0.171,
-  "holdout_brier": 0.0791,
-  "threshold": 0.143
+  "holdout_roc_auc": 0.64,
+  "holdout_pr_auc": 0.166,
+  "holdout_brier": 0.0793,
+  "threshold": 0.142
 }

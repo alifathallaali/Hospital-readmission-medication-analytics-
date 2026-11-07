@@ -1,0 +1,16 @@
+icd_version,icd_code,diagnosis,admissions
+9,4019,Unspecified essential hypertension,68
+10,E785,"Hyperlipidemia, unspecified",57
+9,2724,Other and unspecified hyperlipidemia,55
+10,E039,"Hypothyroidism, unspecified",47
+10,Z794,Long term (current) use of insulin,37
+10,Z87891,Personal history of nicotine dependence,35
+9,42731,Atrial fibrillation,34
+9,25000,"Diabetes mellitus without mention of complication, type II or unspecified type, not stated as uncontrolled",33
+10,I2510,Atherosclerotic heart disease of native coronary artery without angina pectoris,33
+10,F329,"Major depressive disorder, single episode, unspecified",32
+10,I10,Essential (primary) hypertension,32
+9,V1582,Personal history of tobacco use,31
+10,N179,"Acute kidney failure, unspecified",31
+9,311,"Depressive disorder, not elsewhere classified",30
+9,41401,Coronary atherosclerosis of native coronary artery,28

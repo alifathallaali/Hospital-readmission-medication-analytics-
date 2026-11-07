@@ -1,0 +1,10 @@
+{
+  "admissions": 275,
+  "patients": 100,
+  "with_diabetes": 112,
+  "discharged_alive": 260,
+  "readmit_any": 53,
+  "readmit_unplanned": 49,
+  "tables_checked": 31,
+  "table_mismatches": 0
+}
