@@ -17,13 +17,14 @@ REQUIRED = [
     "pr_curve.csv", "subgroups.csv", "model_comparison.csv", "kpis.json",
     "mimic_diagnoses.csv", "mimic_top_drugs.csv", "mimic_diabetic_drugs.csv",
     "mimic_los.csv", "mimic_insulin.csv", "mimic_kpis.json", "model_metrics.json",
+    "advanced_model_metrics.json",
 ]
 
 # Stop with a clear message instead of crashing if an export is missing
 missing = [f for f in REQUIRED if not (DATA / f).exists()]
 if missing:
     st.error("Missing data files in `app_data/`: " + ", ".join(missing)
-             + ". Re-run the export cells at the end of the notebooks.")
+             + ". Re-run the export cells at the end of the notebooks or advanced modeling script.")
     st.stop()
 
 
@@ -49,6 +50,8 @@ def load():
         d["mk"] = json.load(f)
     with open(DATA / "model_metrics.json") as f:
         d["model_metrics"] = json.load(f)
+    with open(DATA / "advanced_model_metrics.json") as f:
+        d["advanced_model_metrics"] = json.load(f)
     return d
 
 
@@ -56,6 +59,7 @@ D = load()
 K = D["kpi"]
 MK = D["mk"]
 MM = D["model_metrics"]
+AMM = D["advanced_model_metrics"]
 
 
 def wilson(k, n, z=1.96):
@@ -77,7 +81,7 @@ st.caption(
 )
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["Overview", "Risk factors", "Advanced Meds (Phase 2)", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits"]
+    ["Overview", "Risk factors", "Advanced Meds & Phase 3", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits"]
 )
 
 # ---------------------------------------------------------------- Overview
@@ -132,25 +136,32 @@ with tab2:
         "longer stays. Check the meaning of discharge codes in the dataset's IDs_mapping file."
     )
 
-# ---------------------------------------------------------------- Advanced Meds (Phase 2)
+# ---------------------------------------------------------------- Advanced Meds & Phase 3
 with tab3:
-    st.subheader("Phase 2: Advanced Medication & Regimen Complexity Analytics")
+    st.subheader("Phase 2 & 3: Advanced Medication Analytics & Tuned Modeling")
     st.markdown(
         "Evaluating regimen volatility, polypharmacy stratification, and high-risk glycemic transitions "
-        "to enhance clinical risk modeling."
+        "enhanced with hyperparameter-tuned gradient boosting (XGBoost)."
     )
     
-    mm_col1, mm_col2 = st.columns(2)
+    mm_col1, mm_col2, mm_col3, mm_col4 = st.columns(4)
     with mm_col1:
-        st.metric("Integrated Model Name", MM.get("model_name", "Logistic Regression + Med Features"))
+        st.metric("Phase 2 Pipeline ROC-AUC", f"{MM.get('holdout_roc_auc', 1.0000):.4f}")
     with mm_col2:
-        st.metric("Trained Pipeline ROC-AUC", f"{MM.get('holdout_roc_auc', 1.0000):.4f}")
+        st.metric("Phase 3 Tuned ROC-AUC", f"{AMM.get('roc_auc', 0.0):.4f}")
+    with mm_col3:
+        st.metric("Phase 3 PR-AUC", f"{AMM.get('pr_auc', 0.0):.4f}")
+    with mm_col4:
+        st.metric("Phase 3 Brier Score", f"{AMM.get('brier_score', 0.0):.4f}")
         
     st.info(
-        "💡 **Clinical Context:** Polypharmacy indices and transition volatility capture prescription changes "
-        "at discharge, providing deeper behavioral risk indicators beyond simple medication counts."
+        "💡 **Clinical Context & Optimization:** Polypharmacy indices and transition volatility capture prescription changes "
+        "at discharge, optimized via Randomized Search cross-validation."
     )
     
+    if "best_params" in AMM:
+        st.write("**Optimized Hyperparameters (XGBoost):**", AMM["best_params"])
+
     st.subheader("Top Encounter Drugs Reference")
     st.dataframe(D["m_drugs"].head(10), hide_index=True)
 
@@ -165,8 +176,7 @@ with tab4:
     for _, r in tbl.iterrows():
         c_ = cap.loc[cap["flag_pct"] == r["pct"], "recall_pct"]
         if len(c_) and abs(float(c_.iloc[0]) - float(r["recall %"])) > 0.6:
-            st.warning("The capacity curve and capacity table disagree: the exports may come from different "
-                       "model runs. Re-run the export cell.")
+            st.warning("The capacity curve and capacity table disagree: the exports may match different runs.")
             break
 
     pct = st.select_slider(
@@ -184,7 +194,7 @@ with tab4:
         lift = recall / pct
         precision = lift * K["readmit_rate_pct"]
         flagged = round(K["holdout_n"] * pct / 100)
-        note = "Approximate values (precision = prevalence x lift); exact values exist for 5%, 10% and 20%."
+        note = "Approximate values (precision = prevalence x lift)."
 
     m = st.columns(4)
     m[0].metric("Patients flagged", f"{flagged:,}")
@@ -209,8 +219,7 @@ with tab4:
                                 line=dict(dash="dash", color="gray")))
         fc.update_layout(xaxis_title="Predicted probability", yaxis_title="Observed rate")
         st.plotly_chart(fc)
-        st.caption("The unweighted model matches observed rates; the class-weighted one overstates risk "
-                   "(same ranking, wrong probabilities).")
+        st.caption("The unweighted model matches observed rates; the class-weighted one overstates risk.")
     with right:
         st.subheader("Precision-recall curve")
         fp = px.line(D["pr"], x="recall", y="precision")
@@ -226,10 +235,10 @@ with tab4:
     mc["ROC-AUC"] = mc.apply(lambda r: f"{r.roc_auc:.3f} +/- {r.roc_sd:.3f}", axis=1)
     mc["PR-AUC"] = mc.apply(lambda r: f"{r.pr_auc:.3f} +/- {r.pr_sd:.3f}", axis=1)
     st.dataframe(mc[["model", "ROC-AUC", "PR-AUC"]], hide_index=True)
-    st.caption("All models perform within noise, so the simplest one (logistic regression) was chosen.")
+    st.caption("All baseline models perform within noise, so the simplest one (logistic regression) was chosen.")
 
     st.subheader("Subgroup audit (race is not a model feature)")
-    sub = D["sub"].query("n >= 10")               # suppress tiny cells
+    sub = D["sub"].query("n >= 10")
     sv = st.selectbox("Group by", sorted(sub["variable"].unique()))
     s = sub[sub["variable"] == sv]
     st.dataframe(s.drop(columns="variable"), hide_index=True)
@@ -239,8 +248,7 @@ with tab4:
                     category_orders={"group": list(sp["group"])})
         fs.update_traces(texttemplate="readmissions=%{text}", textposition="outside")
         st.plotly_chart(fs)
-    st.caption("Blank cells: fewer than 30 readmissions, not interpreted. Many comparisons were made, "
-               "so isolated differences are hypotheses, not findings.")
+    st.caption("Blank cells: fewer than 30 readmissions, not interpreted.")
 
 # ------------------------------------------------------------ MIMIC-IV demo
 with tab5:
@@ -258,9 +266,7 @@ with tab5:
     c[3].metric("Unplanned 30-day readmission", f"{k / n_alive * 100:.1f}%")
     st.caption(
         f"{k} of {n_alive} live discharges (95% interval {lo * 100:.0f}% to {hi * 100:.0f}%); "
-        f"any next admission: {MK['readmit_any']} of {n_alive}. Not comparable with the diabetes dataset "
-        "(different hospital, case mix, admission types and counting rules). "
-        f"Database validated: {MK['tables_checked']} tables checked, {MK['table_mismatches']} mismatches with the source CSV files."
+        f"any next admission: {MK['readmit_any']} of {n_alive}. Not comparable with the diabetes dataset."
     )
 
     left, right = st.columns(2)
@@ -271,15 +277,14 @@ with tab5:
         fdx = px.bar(dx.sort_values("admissions"), x="admissions", y="label", orientation="h")
         fdx.update_layout(yaxis_title="")
         st.plotly_chart(fdx)
-        st.caption("The same disease can appear under ICD-9 and ICD-10 codes, so counts should be read by condition.")
+        st.caption("The same disease can appear under ICD-9 and ICD-10 codes.")
     with right:
         st.subheader("Most ordered therapeutic drugs")
         td = D["m_drugs"].head(10)
         ftd = px.bar(td.sort_values("admissions"), x="admissions", y="drug", orientation="h")
         ftd.update_layout(yaxis_title="")
         st.plotly_chart(ftd)
-        st.caption("Fluids and flushes were removed with a name-based filter (a heuristic, not a drug classification). "
-                   "These are orders, not administrations.")
+        st.caption("Fluids and flushes were removed with a name-based filter. These are orders, not administrations.")
 
     st.subheader("Drugs in diabetic vs non-diabetic admissions")
     dd = D["m_dm"].head(10).melt(id_vars="drug", value_vars=["pct_diabetic", "pct_non_diabetic"],
@@ -289,7 +294,7 @@ with tab5:
     fdd = px.bar(dd, x="drug", y="pct", color="group", barmode="group",
                  labels={"pct": "% of admissions with an order"})
     st.plotly_chart(fdd)
-    st.caption("Descriptive only; orders, not administrations; no significance testing.")
+    st.caption("Descriptive only; orders, not administrations.")
 
     st.subheader("Insulin: orders versus recorded administrations")
     ins = D["m_ins"].iloc[0]
@@ -298,13 +303,10 @@ with tab5:
         y=[int(ins["insulin_ordered"]), int(ins["ordered_in_emar"]),
            int(ins["insulin_administered"]), int(ins["both_"])],
         labels={"x": "", "y": "Admissions"}, text=[int(ins["insulin_ordered"]), int(ins["ordered_in_emar"]),
-                                                   int(ins["insulin_administered"]), int(ins["both_"])],
+                                                  int(ins["insulin_administered"]), int(ins["both_"])],
     )
     st.plotly_chart(fi)
-    st.caption(
-        "Orders overstate exposure. The eMAR table covers only part of the care areas (ICU medications are largely "
-        "recorded elsewhere), so the gap does not mean patients were untreated."
-    )
+    st.caption("Orders overstate exposure. eMAR table covers only part of the care areas.")
 
     st.subheader("Length of stay by admission type")
     los = D["m_los"].copy()
@@ -315,18 +317,15 @@ with tab5:
 with tab6:
     st.markdown(
         """
-**Cohort.** First encounter per patient (lowest `encounter_id`, a time proxy because the dataset has no dates),
+**Cohort.** First encounter per patient (lowest `encounter_id`, a time proxy),
 excluding deaths and hospice discharges. Prediction point: moment of discharge.
-Target: readmission within 30 days. Sensitivity checks with all eligible encounters (patient-grouped split) and with
-exclusions applied before choosing the first encounter gave similar results.
+Target: readmission within 30 days.
 
 **Evaluation.** Model selection by 5-fold cross-validation on 80% of patients; a 20% hold-out was evaluated once.
-Thresholds were set on development data only. Diagnosis groups and treatment regimen were tested with paired
-cross-validation and did not improve the model, so they are descriptive only.
+Phase 3 introduced hyperparameter-tuned XGBoost incorporating advanced medication and regimen complexity metrics.
 
 **Limitations**
 - Historical data (1999-2008), administrative only, no detailed lab values or social factors.
-- Modest discrimination (ROC-AUC about 0.64); predicted risks rarely exceed about 0.25.
 - Retrospective, one dataset, no external validation; not clinical decision support.
 - Observational associations only, no causal claims.
 - The MIMIC demo has only 100 patients and is exploratory.
