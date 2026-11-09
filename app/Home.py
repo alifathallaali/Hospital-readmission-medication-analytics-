@@ -17,14 +17,14 @@ REQUIRED = [
     "pr_curve.csv", "subgroups.csv", "model_comparison.csv", "kpis.json",
     "mimic_diagnoses.csv", "mimic_top_drugs.csv", "mimic_diabetic_drugs.csv",
     "mimic_los.csv", "mimic_insulin.csv", "mimic_kpis.json", "model_metrics.json",
-    "advanced_model_metrics.json",
+    "advanced_model_metrics.json", "medicaid_metrics.json",
 ]
 
 # Stop with a clear message instead of crashing if an export is missing
 missing = [f for f in REQUIRED if not (DATA / f).exists()]
 if missing:
     st.error("Missing data files in `app_data/`: " + ", ".join(missing)
-             + ". Re-run the export cells at the end of the notebooks or advanced modeling script.")
+             + ". Re-run the export cells or analysis scripts.")
     st.stop()
 
 
@@ -52,6 +52,8 @@ def load():
         d["model_metrics"] = json.load(f)
     with open(DATA / "advanced_model_metrics.json") as f:
         d["advanced_model_metrics"] = json.load(f)
+    with open(DATA / "medicaid_metrics.json") as f:
+        d["medicaid_metrics"] = json.load(f)
     return d
 
 
@@ -60,6 +62,7 @@ K = D["kpi"]
 MK = D["mk"]
 MM = D["model_metrics"]
 AMM = D["advanced_model_metrics"]
+MED = D["medicaid_metrics"]
 
 
 def wilson(k, n, z=1.96):
@@ -76,12 +79,11 @@ def wilson(k, n, z=1.96):
 st.title("Hospital Readmission & Medication Analytics")
 st.caption(
     "Retrospective analysis of the Diabetes 130-US Hospitals dataset (1999-2008) plus SQL exploration of the "
-    "MIMIC-IV demo. Educational portfolio project: not clinically validated and not clinical decision support. "
-    "This dashboard shows pre-computed aggregate results; it does not run a live model."
+    "MIMIC-IV demo and Medicaid Pharma Market analytics. Educational portfolio project: not clinically validated."
 )
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["Overview", "Risk factors", "Advanced Meds & Phase 3", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits"]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+    ["Overview", "Risk factors", "Advanced Meds & Phase 3", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits", "Pharma Market (Phase 4)"]
 )
 
 # ---------------------------------------------------------------- Overview
@@ -141,7 +143,7 @@ with tab3:
     st.subheader("Phase 2 & 3: Advanced Medication Analytics & Tuned Modeling")
     st.markdown(
         "Evaluating regimen volatility, polypharmacy stratification, and high-risk glycemic transitions "
-        "enhanced with hyperparameter-tuned gradient boosting (XGBoost)."
+        "enhanced with hyperparameter-tuned gradient boosting."
     )
     
     mm_col1, mm_col2, mm_col3, mm_col4 = st.columns(4)
@@ -160,7 +162,7 @@ with tab3:
     )
     
     if "best_params" in AMM:
-        st.write("**Optimized Hyperparameters (XGBoost):**", AMM["best_params"])
+        st.write("**Optimized Hyperparameters:**", AMM["best_params"])
 
     st.subheader("Top Encounter Drugs Reference")
     st.dataframe(D["m_drugs"].head(10), hide_index=True)
@@ -322,7 +324,7 @@ excluding deaths and hospice discharges. Prediction point: moment of discharge.
 Target: readmission within 30 days.
 
 **Evaluation.** Model selection by 5-fold cross-validation on 80% of patients; a 20% hold-out was evaluated once.
-Phase 3 introduced hyperparameter-tuned XGBoost incorporating advanced medication and regimen complexity metrics.
+Phase 3 introduced hyperparameter-tuned gradient boosting incorporating advanced medication and regimen complexity metrics.
 
 **Limitations**
 - Historical data (1999-2008), administrative only, no detailed lab values or social factors.
@@ -332,4 +334,22 @@ Phase 3 introduced hyperparameter-tuned XGBoost incorporating advanced medicatio
 
 **Data governance.** This app reads small aggregate tables only. No patient-level data are included.
         """
+    )
+
+# ------------------------------------------------------------ Pharma Market (Phase 4)
+with tab7:
+    st.subheader("Phase 4: Medicaid Pharma Market & Utilization Analytics")
+    st.markdown(
+        "Analyzing large-scale drug utilization, prescription patterns, and economic indices from Medicaid data."
+    )
+    
+    p4_col1, p4_col2 = st.columns(2)
+    with p4_col1:
+        st.metric("Analyzed Records Sample", f"{MED.get('total_records_analyzed', 0):,}")
+    with p4_col2:
+        st.metric("Primary Drug Column", MED.get('primary_drug_column', 'N/A'))
+        
+    st.info(
+        "💡 **Enterprise Insight:** Integrating large-scale pharmaceutical utilization datasets provides macro-level "
+        "visibility into drug expenditure trends, complementing patient-level readmission models."
     )
