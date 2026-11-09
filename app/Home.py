@@ -17,7 +17,7 @@ REQUIRED = [
     "pr_curve.csv", "subgroups.csv", "model_comparison.csv", "kpis.json",
     "mimic_diagnoses.csv", "mimic_top_drugs.csv", "mimic_diabetic_drugs.csv",
     "mimic_los.csv", "mimic_insulin.csv", "mimic_kpis.json", "model_metrics.json",
-    "advanced_model_metrics.json", "medicaid_metrics.json",
+    "advanced_model_metrics.json", "medicaid_metrics.json", "medicaid_filtered_summary.csv",
 ]
 
 # Stop with a clear message instead of crashing if an export is missing
@@ -43,6 +43,7 @@ def load():
         "m_dm": pd.read_csv(DATA / "mimic_diabetic_drugs.csv"),
         "m_los": pd.read_csv(DATA / "mimic_los.csv"),
         "m_ins": pd.read_csv(DATA / "mimic_insulin.csv"),
+        "medicaid_filtered": pd.read_csv(DATA / "medicaid_filtered_summary.csv"),
     }
     with open(DATA / "kpis.json") as f:
         d["kpi"] = json.load(f)
@@ -343,13 +344,34 @@ with tab7:
         "Analyzing large-scale drug utilization, prescription patterns, and economic indices from Medicaid data."
     )
     
-    p4_col1, p4_col2 = st.columns(2)
+    p4_col1, p4_col2, p4_col3 = st.columns(3)
     with p4_col1:
         st.metric("Analyzed Records Sample", f"{MED.get('total_records_analyzed', 0):,}")
     with p4_col2:
-        st.metric("Primary Drug Column", MED.get('primary_drug_column', 'N/A'))
+        st.metric("Unique Drugs Tracked", f"{MED.get('unique_drugs', 0):,}")
+    with p4_col3:
+        st.metric("Regions / States", f"{MED.get('unique_states', 0):,}")
         
+    st.markdown("---")
+    st.subheader("Interactive Drug Utilization Explorer & Regional Filtering")
+    
+    df_med = D["medicaid_filtered"]
+    selected_state = st.selectbox("Filter by State / Region", options=sorted(df_med['state'].unique()))
+    
+    filtered_df = df_med[df_med['state'] == selected_state].sort_values(by='utilization_count', ascending=False).head(10)
+    
+    fig_med = px.bar(
+        filtered_df, 
+        x='utilization_count', 
+        y='drug', 
+        orientation='h',
+        labels={'utilization_count': 'Utilization Count', 'drug': 'Drug / Product Code'},
+        title=f"Top 10 Utilized Drugs in {selected_state}"
+    )
+    fig_med.update_layout(yaxis={'categoryorder':'total ascending'})
+    st.plotly_chart(fig_med, use_container_width=True)
+    
     st.info(
-        "💡 **Enterprise Insight:** Integrating large-scale pharmaceutical utilization datasets provides macro-level "
-        "visibility into drug expenditure trends, complementing patient-level readmission models."
+        "💡 **Enterprise Insight:** Dynamic filtering enables health economists and policy makers to drill down into "
+        "regional prescription volumes and identify high-demand pharmaceutical classes instantly."
     )

@@ -1,5 +1,5 @@
 {
-    "total_records_analyzed": 5000,
-    "primary_drug_column": "Product Code",
-    "cost_column_available": true
+    "total_records_analyzed": 30000,
+    "unique_drugs": 2722,
+    "unique_states": 1
 }
