@@ -1,0 +1,11 @@
+{
+    "total_files": 20,
+    "sample_rows": 10000,
+    "top_reported_drugs": [
+        1,
+        2,
+        3,
+        4,
+        5
+    ]
+}

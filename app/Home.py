@@ -18,6 +18,7 @@ REQUIRED = [
     "mimic_diagnoses.csv", "mimic_top_drugs.csv", "mimic_diabetic_drugs.csv",
     "mimic_los.csv", "mimic_insulin.csv", "mimic_kpis.json", "model_metrics.json",
     "advanced_model_metrics.json", "medicaid_metrics.json", "medicaid_filtered_summary.csv",
+    "faers_metrics.json",
 ]
 
 # Stop with a clear message instead of crashing if an export is missing
@@ -55,6 +56,8 @@ def load():
         d["advanced_model_metrics"] = json.load(f)
     with open(DATA / "medicaid_metrics.json") as f:
         d["medicaid_metrics"] = json.load(f)
+    with open(DATA / "faers_metrics.json") as f:
+        d["faers_metrics"] = json.load(f)
     return d
 
 
@@ -64,6 +67,7 @@ MK = D["mk"]
 MM = D["model_metrics"]
 AMM = D["advanced_model_metrics"]
 MED = D["medicaid_metrics"]
+FAERS = D["faers_metrics"]
 
 
 def wilson(k, n, z=1.96):
@@ -80,11 +84,11 @@ def wilson(k, n, z=1.96):
 st.title("Hospital Readmission & Medication Analytics")
 st.caption(
     "Retrospective analysis of the Diabetes 130-US Hospitals dataset (1999-2008) plus SQL exploration of the "
-    "MIMIC-IV demo and Medicaid Pharma Market analytics. Educational portfolio project: not clinically validated."
+    "MIMIC-IV demo, Medicaid Pharma Market analytics, and FDA FAERS Pharmacovigilance. Educational portfolio project."
 )
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
-    ["Overview", "Risk factors", "Advanced Meds & Phase 3", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits", "Pharma Market (Phase 4)"]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+    ["Overview", "Risk factors", "Advanced Meds & Phase 3", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits", "Pharma Market (Phase 4)", "FAERS Safety (Phase 5)"]
 )
 
 # ---------------------------------------------------------------- Overview
@@ -374,4 +378,32 @@ with tab7:
     st.info(
         "💡 **Enterprise Insight:** Dynamic filtering enables health economists and policy makers to drill down into "
         "regional prescription volumes and identify high-demand pharmaceutical classes instantly."
+    )
+
+# ------------------------------------------------------------ FAERS Safety (Phase 5)
+with tab8:
+    st.subheader("Phase 5: FDA FAERS Pharmacovigilance & Safety Analytics")
+    st.markdown(
+        "Analyzing adverse event reporting systems, post-market drug safety signals, and incident reports."
+    )
+    
+    f_col1, f_col2, f_col3 = st.columns(3)
+    with f_col1:
+        st.metric("Total Archive Files", FAERS.get("total_files", 0))
+    with f_col2:
+        st.metric("Sample Rows Processed", f"{FAERS.get('sample_rows', 0):,}")
+    with f_col3:
+        st.metric("Top Tracked Products", len(FAERS.get("top_reported_drugs", [])))
+        
+    st.subheader("Top Reported Drugs in FAERS Sample")
+    top_drugs_list = FAERS.get("top_reported_drugs", [])
+    if top_drugs_list:
+        df_faers_top = pd.DataFrame({"Drug Name / Code": top_drugs_list})
+        st.dataframe(df_faers_top, hide_index=True)
+    else:
+        st.info("No drug samples found in the current FAERS extract.")
+        
+    st.info(
+        "💡 **Pharmacovigilance Insight:** Integrating FDA FAERS post-market safety data allows clinical researchers "
+        "to monitor adverse drug reactions and evaluate real-world safety profiles alongside hospital readmission patterns."
     )
