@@ -2,7 +2,7 @@
 
 An end-to-end healthcare analytics and clinical commercial intelligence project: data cleaning and cohort validation, statistical analysis, 30-day readmission risk modeling evaluated on a sealed hold-out, advanced regimen complexity analytics (Phase 2), and SQL exploration of EHR-structured data (MIMIC-IV demo).
 
-**Author:** Ali Aboelsaad | Pharmacist transitioning into healthcare data analytics | [LinkedIn](https://www.linkedin.com/in/ali-aboelsaad-acim) | [Live Dashboard](https://alifathallaali-hospital-readmission-medication-a-apphome-rjqfxi.streamlit.app)
+**Author:** Ali Aboelsaad | Pharmacist transitioning into healthcare data science | [LinkedIn](https://www.linkedin.com/in/ali-aboelsaad-acim) | [Live Dashboard](https://alifathallaali-hospital-readmission-medication-a-apphome-rjqfxi.streamlit.app)
 
 ## Business question
 Hospitals cannot follow up with every discharged patient. Which patients are most likely to return within 30 days, and how many readmissions could a limited follow-up team reach by focusing on the highest-risk patients?
@@ -22,8 +22,8 @@ Raw data is **not** included in this repository.
 - `src/`: Modular Python scripts (`data_loader.py`, `medication_features.py`, `model_pipeline.py`) implementing the Phase 2 training pipeline and feature engineering.
 - `notebooks/`: Exploratory data analysis, SQL queries, and Phase 2 advanced medication modeling (`03_advanced_medication_features.ipynb`).
 - `app/`: Streamlit dashboard application (`Home.py`).
-- `app_data/`: Pre-computed aggregate metrics, KPIs, and serialized JSON exports (`model_metrics.json`).
-- `tests/`: Automated unit tests for medication feature engineering.
+- `app_data/`: Pre-computed aggregate metrics, KPIs, and serialized JSON exports (`model_metrics.json`, `advanced_model_metrics.json`).
+- `tests/`: Automated unit tests for medication feature engineering and pipeline consistency (`test_consistency.py`, `medication_features_2.py`).
 
 ## Part 1: Readmission analysis and baseline model
 
@@ -46,16 +46,24 @@ Raw data is **not** included in this repository.
 
 ### Model selection & Evaluation (5-fold cross-validation)
 All baseline models performed within noise of each other (ROC-AUC ~0.645), so the simplest interpretable model (**logistic regression**) was selected. 
-- **Sealed Hold-out Evaluation:** ROC-AUC of 0.640 (95% CI 0.626-0.659); PR-AUC of 0.166.
+- **Sealed Hold-out Evaluation:** ROC-AUC of 0.640 (95% CI 0.626-0.659); PR-AUC of 0.166; Brier score: 0.0793.
 - **Capacity Analysis:** Flagging the top 10% highest-risk patients captures **22.2%** of all 30-day readmissions with a precision of 19.9% (2.22x lift vs random).
+
+#### Capacity Table Metrics:
+| Flag Top % | Patients Flagged | Recall % | Lift |
+|---|---|---|---|
+| Top 1% | 699 | 13.8% | 2.76x |
+| Top 2% | 1,399 | 20.5% | 2.05x |
+| Top 4% | 2,798 | 31.2% | 1.56x |
+| Top 10% | 6,997 | 37.4% | 1.87x |
 
 ---
 
 ## Part 2: Phase 2 - Advanced Medication & Regimen Complexity Analytics
 The Phase 2 expansion integrates rigorous pharmaceutical care indicators into the machine learning workflow:
-- **Modular Pipeline (`src/`):** Encapsulated feature engineering and model training into reusable, testable scripts (`medication_features.py`, `model_pipeline.py`).
+- **Modular Pipeline (`src/`):** Encapsulated feature engineering and model training into reusable, testable scripts (`medication_features.py`, `model_pipeline.py`, `advanced_model.py`).
 - **Regimen Volatility & Polypharmacy Indices:** Captures prescription changes, polypharmacy stratification, and high-risk glycemic transition patterns at discharge.
-- **Automated Metrics Serialization:** Model performance and operational metadata are automatically exported to `app_data/model_metrics.json` for seamless dashboard integration.
+- **Automated Metrics Serialization:** Model performance and operational metadata are automatically exported to `app_data/model_metrics.json` and `advanced_model_metrics.json` for seamless dashboard integration.
 
 ---
 
