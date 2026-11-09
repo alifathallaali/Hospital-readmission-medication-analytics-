@@ -18,7 +18,7 @@ REQUIRED = [
     "mimic_diagnoses.csv", "mimic_top_drugs.csv", "mimic_diabetic_drugs.csv",
     "mimic_los.csv", "mimic_insulin.csv", "mimic_kpis.json", "model_metrics.json",
     "advanced_model_metrics.json", "medicaid_metrics.json", "medicaid_filtered_summary.csv",
-    "faers_metrics.json",
+    "faers_metrics.json", "synthea_metrics.json",
 ]
 
 # Stop with a clear message instead of crashing if an export is missing
@@ -58,6 +58,8 @@ def load():
         d["medicaid_metrics"] = json.load(f)
     with open(DATA / "faers_metrics.json") as f:
         d["faers_metrics"] = json.load(f)
+    with open(DATA / "synthea_metrics.json") as f:
+        d["synthea_metrics"] = json.load(f)
     return d
 
 
@@ -68,6 +70,7 @@ MM = D["model_metrics"]
 AMM = D["advanced_model_metrics"]
 MED = D["medicaid_metrics"]
 FAERS = D["faers_metrics"]
+SYN = D["synthea_metrics"]
 
 
 def wilson(k, n, z=1.96):
@@ -84,11 +87,11 @@ def wilson(k, n, z=1.96):
 st.title("Hospital Readmission & Medication Analytics")
 st.caption(
     "Retrospective analysis of the Diabetes 130-US Hospitals dataset (1999-2008) plus SQL exploration of the "
-    "MIMIC-IV demo, Medicaid Pharma Market analytics, and FDA FAERS Pharmacovigilance. Educational portfolio project."
+    "MIMIC-IV demo, Medicaid Pharma Market, FDA FAERS Pharmacovigilance, and Synthea EHR/FHIR standards. Educational portfolio project."
 )
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
-    ["Overview", "Risk factors", "Advanced Meds & Phase 3", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits", "Pharma Market (Phase 4)", "FAERS Safety (Phase 5)"]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
+    ["Overview", "Risk factors", "Advanced Meds & Phase 3", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits", "Pharma Market (Phase 4)", "FAERS Safety (Phase 5)", "EHR & FHIR (Synthea)"]
 )
 
 # ---------------------------------------------------------------- Overview
@@ -398,7 +401,7 @@ with tab8:
     st.subheader("Top Reported Drugs in FAERS Sample")
     top_drugs_list = FAERS.get("top_reported_drugs", [])
     if top_drugs_list:
-        df_faers_top = pd.DataFrame({"Drug Name / Code": top_drugs_list})
+        df_faers_top = pd.DataFrame({"Drug Name": top_drugs_list})
         st.dataframe(df_faers_top, hide_index=True)
     else:
         st.info("No drug samples found in the current FAERS extract.")
@@ -406,4 +409,33 @@ with tab8:
     st.info(
         "💡 **Pharmacovigilance Insight:** Integrating FDA FAERS post-market safety data allows clinical researchers "
         "to monitor adverse drug reactions and evaluate real-world safety profiles alongside hospital readmission patterns."
+    )
+
+# ------------------------------------------------------------ EHR & FHIR (Synthea - Phase 6)
+with tab9:
+    st.subheader("Phase 6: Synthea EHR & FHIR Healthcare Standards Analytics")
+    st.markdown(
+        "Exploring synthetic electronic health record data adhering to HL7 FHIR R4 and US Core standards, "
+        "capturing comprehensive patient journeys, clinical conditions, and encounters."
+    )
+    
+    s_col1, s_col2, s_col3 = st.columns(3)
+    with s_col1:
+        st.metric("Total Synthea Patients", f"{SYN.get('total_synthea_patients', 0):,}")
+    with s_col2:
+        st.metric("Supported FHIR Standards", len(SYN.get('fhir_standards_supported', [])))
+    with s_col3:
+        st.metric("Top Conditions Tracked", len(SYN.get('top_fhir_conditions', [])))
+        
+    st.subheader("Top Recorded Clinical Conditions (FHIR Standards)")
+    top_conds = SYN.get("top_fhir_conditions", [])
+    if top_conds:
+        df_conds = pd.DataFrame({"Condition Description": top_conds})
+        st.dataframe(df_conds, hide_index=True)
+    else:
+        st.info("No clinical conditions found in the current Synthea sample.")
+        
+    st.info(
+        "💡 **Interoperability Insight:** Leveraging FHIR-compliant synthetic datasets allows healthcare systems "
+        "to test multi-source data integration, ensuring seamless exchange of clinical summaries and continuity of care."
     )

@@ -26,8 +26,10 @@ def analyze_faers_data():
             with z.open(drug_files[0]) as f_drug:
                 df_drug = pd.read_csv(f_drug, sep='$', encoding='latin1', low_memory=False, nrows=10000)
                 sample_rows = len(df_drug)
-                # البحث عن عمود اسم الدواء أو المنتج
-                col_name = next((c for c in df_drug.columns if 'drug' in c.lower() or 'name' in c.lower()), df_drug.columns[1] if len(df_drug.columns)>1 else df_drug.columns[0])
+                
+                # البحث عن عمود يحتوي على اسم الدواء صراحة
+                col_name = next((c for c in df_drug.columns if 'drugname' in c.lower() or 'name' in c.lower()), df_drug.columns[1])
+                
                 top_drugs = df_drug[col_name].value_counts().head(5).index.tolist()
                 
         metrics = {

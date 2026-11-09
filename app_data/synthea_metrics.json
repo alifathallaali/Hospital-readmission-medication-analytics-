@@ -1,0 +1,15 @@
+{
+    "total_synthea_patients": 111,
+    "top_fhir_conditions": [
+        314529007,
+        66383009,
+        73595000,
+        160903007,
+        444814009
+    ],
+    "fhir_standards_supported": [
+        "US Core Implementation Guide",
+        "FHIR R4",
+        "Clinical Encounters"
+    ]
+}
