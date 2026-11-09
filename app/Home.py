@@ -18,7 +18,7 @@ REQUIRED = [
     "mimic_diagnoses.csv", "mimic_top_drugs.csv", "mimic_diabetic_drugs.csv",
     "mimic_los.csv", "mimic_insulin.csv", "mimic_kpis.json", "model_metrics.json",
     "advanced_model_metrics.json", "medicaid_metrics.json", "medicaid_filtered_summary.csv",
-    "faers_metrics.json", "synthea_metrics.json",
+    "faers_metrics.json", "synthea_metrics.json", "hrrp_metrics.json",
 ]
 
 # Stop with a clear message instead of crashing if an export is missing
@@ -60,6 +60,8 @@ def load():
         d["faers_metrics"] = json.load(f)
     with open(DATA / "synthea_metrics.json") as f:
         d["synthea_metrics"] = json.load(f)
+    with open(DATA / "hrrp_metrics.json") as f:
+        d["hrrp_metrics"] = json.load(f)
     return d
 
 
@@ -71,6 +73,7 @@ AMM = D["advanced_model_metrics"]
 MED = D["medicaid_metrics"]
 FAERS = D["faers_metrics"]
 SYN = D["synthea_metrics"]
+HRRP = D["hrrp_metrics"]
 
 
 def wilson(k, n, z=1.96):
@@ -87,11 +90,11 @@ def wilson(k, n, z=1.96):
 st.title("Hospital Readmission & Medication Analytics")
 st.caption(
     "Retrospective analysis of the Diabetes 130-US Hospitals dataset (1999-2008) plus SQL exploration of the "
-    "MIMIC-IV demo, Medicaid Pharma Market, FDA FAERS Pharmacovigilance, and Synthea EHR/FHIR standards. Educational portfolio project."
+    "MIMIC-IV demo, Medicaid Pharma Market, FDA FAERS, Synthea EHR/FHIR, and CMS HRRP hospital penalties. Educational portfolio project."
 )
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
-    ["Overview", "Risk factors", "Advanced Meds & Phase 3", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits", "Pharma Market (Phase 4)", "FAERS Safety (Phase 5)", "EHR & FHIR (Synthea)"]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(
+    ["Overview", "Risk factors", "Advanced Meds & Phase 3", "Model performance", "MIMIC-IV demo (SQL)", "Methodology and limits", "Pharma Market (Phase 4)", "FAERS Safety (Phase 5)", "EHR & FHIR (Synthea)", "CMS HRRP Penalties (Phase 7)"]
 )
 
 # ---------------------------------------------------------------- Overview
@@ -438,4 +441,33 @@ with tab9:
     st.info(
         "💡 **Interoperability Insight:** Leveraging FHIR-compliant synthetic datasets allows healthcare systems "
         "to test multi-source data integration, ensuring seamless exchange of clinical summaries and continuity of care."
+    )
+
+# ------------------------------------------------------------ CMS HRRP Penalties (Phase 7)
+with tab10:
+    st.subheader("Phase 7: CMS HRRP Hospital Penalties & Financial Impact")
+    st.markdown(
+        "Analyzing Hospital Readmissions Reduction Program (HRRP) metrics, excess readmission ratios, "
+        "and reimbursement penalties under CMS guidelines."
+    )
+    
+    h_col1, h_col2, h_col3 = st.columns(3)
+    with h_col1:
+        st.metric("Hospitals Evaluated", f"{HRRP.get('total_hospitals_evaluated', 0):,}")
+    with h_col2:
+        st.metric("Program Evaluation Cycle", HRRP.get("hrrp_program_year", "FY 2026"))
+    with h_col3:
+        st.metric("Sample Tracked Facilities", len(HRRP.get("sample_top_hospitals", [])))
+        
+    st.subheader("Sample Evaluated Hospitals Reference")
+    sample_hospitals = HRRP.get("sample_top_hospitals", [])
+    if sample_hospitals:
+        df_hrrp_top = pd.DataFrame({"Hospital Name": sample_hospitals})
+        st.dataframe(df_hrrp_top, hide_index=True)
+    else:
+        st.info("No hospital sample records found in current HRRP extract.")
+        
+    st.info(
+        "💡 **Financial & Regulatory Insight:** Connecting predictive readmission risk models with CMS financial penalties "
+        "empowers health systems to proactively mitigate revenue risks and optimize care coordination resources."
     )
