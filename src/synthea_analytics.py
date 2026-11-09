@@ -14,12 +14,10 @@ def analyze_synthea_data():
     output_dir = Path("app_data")
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # فك الملف المؤرشف مؤقتاً لقراءة عينة من ملفات السجلات الصحية
     with zipfile.ZipFile(zip_path, 'r') as z:
         file_list = z.namelist()
         print(f"Total files in Synthea archive: {len(file_list)}")
         
-        # البحث عن ملف المرضى (patients.csv) وملف اللقاءات أو الحالات (encounters.csv أو conditions.csv)
         patient_file = next((f for f in file_list if 'patient' in f.lower() and f.endswith('.csv')), None)
         condition_file = next((f for f in file_list if 'condition' in f.lower() and f.endswith('.csv')), None)
         
@@ -34,9 +32,12 @@ def analyze_synthea_data():
         if condition_file:
             with z.open(condition_file) as f:
                 df_conditions = pd.read_csv(f)
-                # البحث عن عمود الوصف أو اسم المرض
-                desc_col = next((c for c in df_conditions.columns if 'description' in c.lower() or 'code' in c.lower()), df_conditions.columns[0])
-                top_conditions = df_conditions[desc_col].value_counts().head(5).index.tolist()
+                # إعطاء الأولوية القصوى لعمود الوصف (description) لجلب النصوص الطبية لا الأكواد الرقمية
+                desc_col = next((c for c in df_conditions.columns if 'description' in c.lower()), None)
+                if not desc_col:
+                    desc_col = next((c for c in df_conditions.columns if 'code' in c.lower()), df_conditions.columns[0])
+                
+                top_conditions = df_conditions[desc_col].dropna().value_counts().head(5).index.tolist()
                 
         metrics = {
             "total_synthea_patients": total_patients,

@@ -2,10 +2,10 @@
     "total_hospitals_evaluated": 5000,
     "sample_top_hospitals": [
         "SOUTHEAST HEALTH MEDICAL CENTER",
-        "SOUTHEAST HEALTH MEDICAL CENTER",
-        "SOUTHEAST HEALTH MEDICAL CENTER",
-        "SOUTHEAST HEALTH MEDICAL CENTER",
-        "SOUTHEAST HEALTH MEDICAL CENTER"
+        "MARSHALL MEDICAL CENTERS",
+        "NORTH ALABAMA MEDICAL CENTER",
+        "MIZELL MEMORIAL HOSPITAL",
+        "CRENSHAW COMMUNITY HOSPITAL"
     ],
     "hrrp_program_year": "FY 2026",
     "description": "CMS Hospital Readmissions Reduction Program financial penalties and excess readmission ratios."

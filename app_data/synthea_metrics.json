@@ -1,11 +1,11 @@
 {
     "total_synthea_patients": 111,
     "top_fhir_conditions": [
-        314529007,
-        66383009,
-        73595000,
-        160903007,
-        444814009
+        "Medication review due (situation)",
+        "Gingivitis (disorder)",
+        "Stress (finding)",
+        "Full-time employment (finding)",
+        "Viral sinusitis (disorder)"
     ],
     "fhir_standards_supported": [
         "US Core Implementation Guide",
