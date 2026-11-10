@@ -1,0 +1,61 @@
+{
+  "project_name": "Hospital Readmission & Medication Analytics",
+  "phase": "Phase 8 - Platform Audit & Data Integrity Recovery",
+  "version": "2.0.0",
+  "timestamp": "2026-11-09T00:00:00Z",
+  "sources": [
+    {
+      "id": "diabetes_130_us",
+      "name": "Diabetes 130-US Hospitals (1999-2008)",
+      "raw_file": "data/diabetic_data.csv",
+      "records": 101766,
+      "canonical_cohort_records": 69970,
+      "outputs": [
+        "app_data/model_metrics.json",
+        "app_data/advanced_model_metrics.json",
+        "app_data/capacity_table.csv",
+        "app_data/calibration.csv"
+      ]
+    },
+    {
+      "id": "mimic_iv_demo",
+      "name": "MIMIC-IV Clinical Database Demo v2.2",
+      "raw_file": "data/mimic_demo.db",
+      "tables_count": 31,
+      "outputs": [
+        "app_data/mimic_kpis.json",
+        "app_data/mimic_top_drugs.csv",
+        "app_data/mimic_diagnoses.csv"
+      ]
+    },
+    {
+      "id": "medicaid_sdud",
+      "name": "Medicaid State Drug Utilization Data",
+      "outputs": [
+        "app_data/medicaid_metrics.json",
+        "app_data/medicaid_filtered_summary.csv"
+      ]
+    },
+    {
+      "id": "fda_faers",
+      "name": "FDA FAERS Safety Data",
+      "outputs": [
+        "app_data/faers_metrics.json"
+      ]
+    },
+    {
+      "id": "synthea_ehr",
+      "name": "Synthea EHR / FHIR Synthetic Data",
+      "outputs": [
+        "app_data/synthea_metrics.json"
+      ]
+    },
+    {
+      "id": "cms_hrrp",
+      "name": "CMS HRRP Hospital Penalties",
+      "outputs": [
+        "app_data/hrrp_metrics.json"
+      ]
+    }
+  ]
+}
